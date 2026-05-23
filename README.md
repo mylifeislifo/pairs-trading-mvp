@@ -1,20 +1,38 @@
 # pairs-trading-mvp
 
-> 통계적 차익거래 페어 트레이딩 — 알고리즘 명세서부터 3단 검증 체계까지
+> 통계적 차익거래 페어 트레이딩 — 알고리즘 명세서부터 4단 MVP까지
 
-명세서 v2의 §1~4, §8을 코드로 구현하고, 단일 split → K-fold → 오버핏 진단으로 검증 체계를 단계적으로 강화한 연구 기록.
+명세서 v2의 §1~4, §7, §8을 코드로 구현하고, 단일 split → K-fold → 오버핏 진단 → Kalman 동적 베타까지 검증 체계를 단계적으로 강화한 연구 기록.
 
-## 핵심 발견
+## MVP 진화 요약
 
-**GDX~KO 페어 진단의 3단 변천사**:
-
-| MVP | 검증 방법 | 결론 |
+| MVP | 추가 도구 | 발견 |
 |---|---|---|
-| 1차 | 단일 70/30 split | "망함" (Sharpe -0.49, 수익률 -3.28%) |
-| 2차 | 5-fold Purged K-fold | "견고" (Sharpe +2.24, 4/5 fold 양수) |
-| **3차** | **+ Sensitivity + Permutation** | **"Grade A — 모든 진단 통과"** |
+| 1차 | 단일 70/30 split + 백테스트 엔진 | GDX~KO "망함" (-3.28%) |
+| 2차 | Purged K-fold + Embargo | GDX~KO 사실은 "견고" (+2.24 Sharpe) |
+| 3차 | Sensitivity + Permutation Test | GDX~KO "Grade A" 모든 진단 통과 |
+| **4차** | **Kalman 동적 베타 (§7)** | **가설 부분 지지 — Kalman은 regime change 보험, 평균회귀와 충돌** |
 
-같은 페어, 같은 데이터. 다른 건 검증 방법뿐. **1차 MVP가 완전히 잘못된 결론을 내렸음**이 결정적으로 증명됨.
+## 핵심 발견 모음
+
+### Discovery 1 — 단일 split의 거짓말 (1차→2차→3차)
+
+**같은 페어, 같은 데이터, 다른 검증 방법** :
+- 1차: GDX~KO Sharpe **-0.49** ("망함")
+- 2차: GDX~KO Sharpe **+2.24** ("견고")
+- 3차: GDX~KO **Grade A** (3개 진단 모두 통과)
+
+**1차 MVP의 단일 split이 우연히 가장 안 좋은 fold(fold 3)에 걸렸을 뿐**. K-fold + 오버핏 진단으로 보면 진짜 견고한 페어.
+
+### Discovery 2 — Kalman의 양면성 (4차)
+
+**가설 검증**: "Kalman 동적 베타가 fold 3 손실을 줄이나?"
+- ✓ **Fold 3 Sharpe -0.29 → +4.43** (가설 지지)
+- ✗ **Fold 1, 2의 Sharpe +5, +4 → -1, -3** (예상 못 한 악화)
+
+**Kalman은 spread를 안정화시키는 도구. 그런데 평균회귀 거래는 spread 불안정을 활용**. 두 도구가 본질적으로 충돌.
+
+**결론**: Kalman = "regime change 보험"으로는 명확히 작동, "표준 도구"로는 부적합. 선택적 활성화 필요.
 
 ## 디렉토리 구조
 
@@ -22,30 +40,35 @@
 pairs-trading-mvp/
 ├── docs/             # 명세서 + 단계별 보고서
 │   ├── 00_spec_v2.md         # 수학 알고리즘 명세서 (§1~10, v1 8개 오류 수정)
-│   ├── 01_mvp1_report.md     # 1차 — 단일 split 백테스트
+│   ├── 01_mvp1_report.md     # 1차 — 단일 split
 │   ├── 02_mvp2_report.md     # 2차 — Purged K-fold
-│   └── 03_mvp3_report.md     # 3차 — 오버핏 진단
+│   ├── 03_mvp3_report.md     # 3차 — 오버핏 진단
+│   └── 04_mvp4_report.md     # 4차 — Kalman 동적 베타
 ├── src/              # 핵심 모듈
-│   ├── pairs_trading_mvp.py  # PairsFinder, SignalGenerator, KellySizer, Backtester
-│   ├── purged_kfold.py       # PurgedKFold + kfold_evaluate_pair
-│   └── overfit_diagnostics.py # ParameterSensitivityAnalyzer + PermutationTester
+│   ├── pairs_trading_mvp.py  # §1~4: PairsFinder, SignalGenerator, KellySizer, Backtester
+│   ├── purged_kfold.py       # §8: PurgedKFold + kfold_evaluate_pair
+│   ├── overfit_diagnostics.py # Parameter Sensitivity + Permutation Test
+│   └── kalman_pairs.py       # §7: 동적 베타 + 동적 spread + DynamicBacktester
 ├── scripts/          # 실행 스크립트
 │   ├── run_backtest.py
 │   ├── run_kfold_backtest.py
-│   └── run_overfit_test.py
+│   ├── run_overfit_test.py
+│   └── run_kalman_test.py
 └── charts/           # 시각화 결과
     ├── mvp1_pairs_backtest.png
     ├── mvp2_kfold_robustness.png
-    └── mvp3_overfit_diagnostics.png
+    ├── mvp3_overfit_diagnostics.png
+    └── mvp4_kalman_comparison.png
 ```
 
-## 3단 검증 체계
+## 4단 검증 체계
 
 ```
-Layer 1: 발굴   (ADF + 공적분 + Half-life + TLS)
-Layer 2: 검증   (Purged K-fold + Embargo)
+Layer 1: 발굴   (§1 ADF + §2 공적분 + Half-life + TLS)
+Layer 2: 검증   (§8 Purged K-fold + Embargo)
 Layer 3: 진단   (Parameter Sensitivity + Permutation Test + Grading A-F)
-Layer 4: 배분   (Kelly: 단일 + 포트폴리오)
+Layer 4: 베타   (§7 Kalman 동적 베타 — 선택적/조건부)
+Layer 5: 배분   (§4 Kelly: 단일 + 포트폴리오)
 ```
 
 ## 실행
@@ -53,40 +76,25 @@ Layer 4: 배분   (Kelly: 단일 + 포트폴리오)
 ```bash
 pip install numpy pandas scipy statsmodels yfinance matplotlib
 
-# 1차: 단일 split 백테스트
-python3 scripts/run_backtest.py
-
-# 2차: K-fold 검증
-python3 scripts/run_kfold_backtest.py
-
-# 3차: 오버핏 진단
-python3 scripts/run_overfit_test.py
+python3 scripts/run_backtest.py        # 1차: 단일 split
+python3 scripts/run_kfold_backtest.py  # 2차: K-fold
+python3 scripts/run_overfit_test.py    # 3차: 오버핏 진단
+python3 scripts/run_kalman_test.py     # 4차: Kalman 비교
 ```
 
-## 명세서 v2 — 구현된 알고리즘
+## 시각화 모음
 
-`docs/00_spec_v2.md` 참조. 핵심 항목:
-
-| § | 알고리즘 | 구현 위치 |
-|---|---|---|
-| 1 | ADF 단위근 검정 | `src/pairs_trading_mvp.py::PairsFinder.is_nonstationary` |
-| 2 | 공적분 + Half-life + TLS | `src/pairs_trading_mvp.py::PairsFinder.screen_pairs` |
-| 3 | Z-score (position + force_close) | `src/pairs_trading_mvp.py::SignalGenerator` |
-| 4 | 켈리 (단일 + 포트폴리오) | `src/pairs_trading_mvp.py::KellySizer` |
-| 8 | Purged K-fold + Embargo | `src/purged_kfold.py::PurgedKFold` |
-| - | Parameter Sensitivity | `src/overfit_diagnostics.py::ParameterSensitivityAnalyzer` |
-| - | Permutation Test | `src/overfit_diagnostics.py::PermutationTester` |
-
-## 시각화 결과
-
-### 1차 MVP — 단일 split 백테스트
+### 1차 — 단일 split 백테스트
 ![1차](charts/mvp1_pairs_backtest.png)
 
-### 2차 MVP — K-fold 견고성
+### 2차 — K-fold 견고성
 ![2차](charts/mvp2_kfold_robustness.png)
 
-### 3차 MVP — 오버핏 진단
+### 3차 — 오버핏 진단 (5개 페어)
 ![3차](charts/mvp3_overfit_diagnostics.png)
+
+### 4차 — 정적 vs Kalman 동적
+![4차](charts/mvp4_kalman_comparison.png)
 
 ## 절대 모방 금지
 
@@ -98,12 +106,13 @@ python3 scripts/run_overfit_test.py
 
 ## 다음 단계
 
-1. **§4 펀더멘털 필터** — BAC~NVDA 같은 거시 의존성 거짓 양성 차단
-2. **롤링 페어 재발굴** — 페어 풀 신선도 유지 (30~60일 주기)
-3. **§7 Kalman 동적 베타** — regime change 부분 대응
-4. **§4-C 포트폴리오 켈리** — 다중 페어 동시 운용
+1. **롤링 페어 재발굴** — 가장 본질적 해결책 (regime change 자동 대응)
+2. **선택적 Kalman 활성화** — CUSUM/Bai-Perron으로 구조변화 감지 시에만 켜기
+3. **Dual-strategy ensemble** — 정적/동적 두 전략 동시 운용 후 가중
+4. **§4 펀더멘털 필터** — 거시 의존성 거짓 양성 차단
+5. **§4-C 포트폴리오 켈리** — 다중 페어 동시 운용
 
-각 개선의 진짜 효과는 이제 3단 검증 체계로 정량 비교 가능.
+각 개선의 진짜 효과는 4단 검증 체계로 정량 비교 가능.
 
 ## 라이선스
 
