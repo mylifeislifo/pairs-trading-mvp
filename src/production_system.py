@@ -95,7 +95,9 @@ class ProductionSystem:
                  min_historical_sharpe: Optional[float] = None,
                  quality_lookback: int = 90,
                  # ===== 9차-A: 강제 고정 페어 풀 (롤링 우회) =====
-                 fixed_pair_pool: Optional[list] = None):
+                 fixed_pair_pool: Optional[list] = None,
+                 # ===== 9차-B: 신규 페어 cooldown =====
+                 pair_cooldown_days: int = 0):
         self.finder = finder
         self.lookback_days = lookback_days
         self.refresh_every_days = refresh_every_days
@@ -114,8 +116,11 @@ class ProductionSystem:
         self.quality_lookback = quality_lookback
         # 9차-A
         self.fixed_pair_pool = fixed_pair_pool
+        # 9차-B
+        self.pair_cooldown_days = pair_cooldown_days
         # 진단용: 필터로 컷된 페어 추적
         self.filter_log: list[dict] = []
+        self.cooldown_log: list[dict] = []
 
     def _filter_and_cap_pairs(self,
                               active_pair_ids: list[str],
@@ -279,10 +284,42 @@ class ProductionSystem:
         portfolio_ret = pd.Series(0.0, index=price_df.index, dtype=float)
         pair_lifetime_pnl = {pid: 0.0 for pid in pair_results}
 
+        # 9차-B: 페어별 풀 진입 시점 추적 (cooldown 적용용)
+        first_entry: dict[str, pd.Timestamp] = {}
+
         for snap_idx, snap in enumerate(snapshots):
             current_date = snap.date
+            # 이 시점의 후보 풀 (PairsFinder가 발굴한 것)
+            current_pool_ids = {f'{p.y}~{p.x}' for p in snap.pairs}
+
+            # 9차-B cooldown 추적: 풀에서 빠진 페어 → first_entry 삭제,
+            #                    새로 들어온 페어 → first_entry 기록
+            if self.pair_cooldown_days > 0:
+                for pid in list(first_entry.keys()):
+                    if pid not in current_pool_ids:
+                        del first_entry[pid]
+                for pid in current_pool_ids:
+                    if pid not in first_entry:
+                        first_entry[pid] = current_date
+
             active_pair_ids = [f'{p.y}~{p.x}' for p in snap.pairs
                               if f'{p.y}~{p.x}' in pair_results]
+
+            # 9차-B cooldown 필터: cooldown 미경과 페어 제외
+            if self.pair_cooldown_days > 0:
+                pre_cd = list(active_pair_ids)
+                active_pair_ids = [
+                    pid for pid in active_pair_ids
+                    if (current_date - first_entry[pid]).days
+                       >= self.pair_cooldown_days
+                ]
+                blocked = [pid for pid in pre_cd if pid not in active_pair_ids]
+                if blocked:
+                    self.cooldown_log.append({
+                        'date': current_date,
+                        'blocked': blocked,
+                        'survived': list(active_pair_ids),
+                    })
 
             # ===== 8차 MVP: 품질 필터 + cap =====
             if (self.max_active_pairs is not None

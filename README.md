@@ -17,6 +17,7 @@
 | 7차 | 통합 시스템 + 4-way 비교 | **단순 고정 풀이 정교한 완전 통합을 압도** |
 | 8차 | 품질 필터 (cap + min_sharpe) 튜닝 | 가설 기각, 손실 -20.86% → -6.53%로 축소. "Sharpe 필터는 잉여, cap만이 본질" |
 | **9-A** | **(b) vs (d3) 격차 분해 — fixed_pair_pool 옵션** | **격차 -9.48%p의 -9.78%p가 "롤링 효과". 켈리/필터는 +0.30%p로 무해. 롤링 자체가 진짜 문제** |
+| **9-B** | **신규 페어 cooldown 휴리스틱 sweep** | **가설 ✓ 입증. cd=30으로 -6.53% → +0.23% 양수 회복. 그러나 (b) +2.94%는 못 따라잡음. refresh_every=30이 자연 cooldown 단위** |
 
 ## 핵심 발견 모음
 
@@ -115,6 +116,9 @@ python3 scripts/run_kalman_test.py     # 4차: Kalman 비교
 
 ### 9차-A — (b) vs (d3) 격차 분해
 ![9-A](charts/mvp9a_decomposition.png)
+
+### 9차-B — Cooldown sweep
+![9-B](charts/mvp9b_cooldown_sweep.png)
 
 ## 절대 모방 금지
 
