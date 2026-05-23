@@ -18,6 +18,7 @@
 | 8차 | 품질 필터 (cap + min_sharpe) 튜닝 | 가설 기각, 손실 -20.86% → -6.53%로 축소. "Sharpe 필터는 잉여, cap만이 본질" |
 | **9-A** | **(b) vs (d3) 격차 분해 — fixed_pair_pool 옵션** | **격차 -9.48%p의 -9.78%p가 "롤링 효과". 켈리/필터는 +0.30%p로 무해. 롤링 자체가 진짜 문제** |
 | **9-B** | **신규 페어 cooldown 휴리스틱 sweep** | **가설 ✓ 입증. cd=30으로 -6.53% → +0.23% 양수 회복. 그러나 (b) +2.94%는 못 따라잡음. refresh_every=30이 자연 cooldown 단위** |
+| **9-D** | **Refresh × Cooldown 2D grid sweep** | **★ (b) 최초 능가: refresh=180 + cd=0 → +6.54% (수익률), refresh=180 + cd=30 → Sharpe +0.73 / MDD -1.21%. but snapshot 3개로 표본 부족 경고. 회전율 자체가 본질적 원인임이 입증** |
 
 ## 핵심 발견 모음
 
@@ -119,6 +120,9 @@ python3 scripts/run_kalman_test.py     # 4차: Kalman 비교
 
 ### 9차-B — Cooldown sweep
 ![9-B](charts/mvp9b_cooldown_sweep.png)
+
+### 9차-D — Refresh × Cooldown 2D sweep
+![9-D](charts/mvp9d_refresh_sweep.png)
 
 ## 절대 모방 금지
 
