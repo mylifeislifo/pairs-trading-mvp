@@ -1,6 +1,6 @@
 """
-Production Pairs Trading System — 7차 MVP
-===========================================
+Production Pairs Trading System — 7차 + 8차 MVP
+================================================
 
 1~6차 MVP의 모든 발견을 통합한 실전 시뮬레이션:
 
@@ -12,10 +12,19 @@ Production Pairs Trading System — 7차 MVP
   6차: 매월 페어 풀 갱신 필수                              →  RollingPairsManager
   7차: 다중 페어 동시 운용 + 포트폴리오 켈리              →  이 모듈
 
+8차 MVP 추가: 페어 품질 필터링
+  - max_active_pairs: 매월 운용 페어 cap (신호 농축)
+  - min_historical_sharpe: 과거 Sharpe 음수 페어 차단 (악성 제거)
+  - quality_lookback: 과거 성과 평가 윈도우 (일)
+
+7차 발견: 소수의 악성 페어(AMD 계열)가 좋은 페어 10개 수익 다 까먹음
+→ 8차 가설: 사전 Sharpe 필터 + 페어 수 cap이면 회복 가능
+
 비유로 풀면:
   - 단일 페어 운용 = 한 종목만 사는 것
   - 다중 페어 운용 = 분산 투자 (10~15개 페어 동시 운용)
   - 포트폴리오 켈리 = 각 페어에 얼마씩 배분할지 자동 결정
+  - 품질 필터 = 매월 면접관 자세로 페어 평가, 불합격은 그 달 빼버림
 """
 
 from __future__ import annotations
@@ -80,7 +89,11 @@ class ProductionSystem:
                  fee_rate: float = 0.0004,
                  slippage: float = 0.0005,
                  portfolio_kelly_fraction: float = 0.25,
-                 use_history_for_kelly: bool = True):
+                 use_history_for_kelly: bool = True,
+                 # ===== 8차 MVP 튜닝 파라미터 =====
+                 max_active_pairs: Optional[int] = None,
+                 min_historical_sharpe: Optional[float] = None,
+                 quality_lookback: int = 90):
         self.finder = finder
         self.lookback_days = lookback_days
         self.refresh_every_days = refresh_every_days
@@ -93,6 +106,89 @@ class ProductionSystem:
         self.slippage = slippage
         self.portfolio_kelly_fraction = portfolio_kelly_fraction
         self.use_history_for_kelly = use_history_for_kelly
+        # 8차 튜닝
+        self.max_active_pairs = max_active_pairs
+        self.min_historical_sharpe = min_historical_sharpe
+        self.quality_lookback = quality_lookback
+        # 진단용: 필터로 컷된 페어 추적
+        self.filter_log: list[dict] = []
+
+    def _filter_and_cap_pairs(self,
+                              active_pair_ids: list[str],
+                              pair_results: dict,
+                              current_date: pd.Timestamp,
+                              price_df: pd.DataFrame) -> tuple[list[str], dict]:
+        """
+        8차 MVP 핵심: 페어 품질 필터링 + 운용 수 cap.
+
+        과거 quality_lookback 일간의 일별 수익률로 Sharpe 계산 → 두 가지 필터 적용:
+          (1) min_historical_sharpe: 음수/저조한 페어 제거
+          (2) max_active_pairs: 상위 N개만 남김
+
+        반환: (필터 통과한 페어 ID, 각 페어의 historical Sharpe dict)
+
+        엣지케이스:
+          - 초기 기간이라 lookback 데이터가 20일 미만이면 필터 적용 안 함 (charitable)
+          - 두 파라미터 모두 None이면 원본 그대로 반환
+        """
+        # No filtering requested
+        if (self.min_historical_sharpe is None
+                and self.max_active_pairs is None):
+            return active_pair_ids, {}
+
+        try:
+            loc = price_df.index.get_loc(current_date)
+        except KeyError:
+            return active_pair_ids, {}
+
+        lookback_start = max(0, loc - self.quality_lookback)
+        lookback_end = loc
+
+        # 초기 기간 — 충분한 데이터 없으면 필터 보류
+        if lookback_end - lookback_start < 20:
+            return active_pair_ids, {}
+
+        # 각 페어의 과거 Sharpe 계산
+        pair_sharpes: dict[str, float] = {}
+        for pid in active_pair_ids:
+            if pid not in pair_results:
+                continue
+            daily_ret = pair_results[pid]['daily_return'].iloc[
+                lookback_start:lookback_end].dropna()
+            if len(daily_ret) < 10 or daily_ret.std() == 0:
+                # 정보 부족 → 0으로 둠 (min_sharpe=0이면 컷, 음수면 통과)
+                pair_sharpes[pid] = 0.0
+                continue
+            sh = float(daily_ret.mean() / daily_ret.std() * np.sqrt(252))
+            pair_sharpes[pid] = sh
+
+        # (1) min_historical_sharpe 필터
+        if self.min_historical_sharpe is not None:
+            filtered = [pid for pid, sh in pair_sharpes.items()
+                        if sh >= self.min_historical_sharpe]
+        else:
+            filtered = list(pair_sharpes.keys())
+
+        # (2) max_active_pairs cap (Sharpe 상위 N)
+        if (self.max_active_pairs is not None
+                and len(filtered) > self.max_active_pairs):
+            filtered = sorted(filtered,
+                              key=lambda p: pair_sharpes[p],
+                              reverse=True)[:self.max_active_pairs]
+
+        # 진단 로그
+        self.filter_log.append({
+            'date': current_date,
+            'candidates': len(active_pair_ids),
+            'after_sharpe_filter': len([p for p in pair_sharpes
+                                        if self.min_historical_sharpe is None
+                                        or pair_sharpes[p] >= self.min_historical_sharpe]),
+            'final': len(filtered),
+            'pair_sharpes': dict(pair_sharpes),
+            'selected': list(filtered),
+        })
+
+        return filtered, pair_sharpes
 
     def run(self, price_df: pd.DataFrame,
             verbose: bool = False) -> PortfolioBacktestResult:
@@ -160,6 +256,12 @@ class ProductionSystem:
             active_pair_ids = [f'{p.y}~{p.x}' for p in snap.pairs
                               if f'{p.y}~{p.x}' in pair_results]
 
+            # ===== 8차 MVP: 품질 필터 + cap =====
+            if (self.max_active_pairs is not None
+                    or self.min_historical_sharpe is not None):
+                active_pair_ids, _sharpes = self._filter_and_cap_pairs(
+                    active_pair_ids, pair_results, current_date, price_df)
+
             if not active_pair_ids:
                 # 이 달엔 운용 페어 없음 → 현금 보유
                 state = MonthlyPosition(
@@ -222,9 +324,12 @@ class ProductionSystem:
                     month_start:month_end].sum()
                 pair_pnl[pid] = w * month_ret * self.initial_capital
 
+            # 필터 통과한 페어 객체만 monthly state에 기록
+            active_pair_objects = [p for p in snap.pairs
+                                   if f'{p.y}~{p.x}' in active_pair_ids]
             state = MonthlyPosition(
                 date=current_date,
-                active_pairs=snap.pairs,
+                active_pairs=active_pair_objects,
                 pair_weights=pair_weights,
                 pair_pnl=pair_pnl,
                 portfolio_pnl=sum(pair_pnl.values()),

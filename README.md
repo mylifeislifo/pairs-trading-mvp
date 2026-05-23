@@ -11,7 +11,11 @@
 | 1차 | 단일 70/30 split + 백테스트 엔진 | GDX~KO "망함" (-3.28%) |
 | 2차 | Purged K-fold + Embargo | GDX~KO 사실은 "견고" (+2.24 Sharpe) |
 | 3차 | Sensitivity + Permutation Test | GDX~KO "Grade A" 모든 진단 통과 |
-| **4차** | **Kalman 동적 베타 (§7)** | **가설 부분 지지 — Kalman은 regime change 보험, 평균회귀와 충돌** |
+| 4차 | Kalman 동적 베타 (§7) | 가설 부분 지지 — regime change 보험으로만 작동 |
+| 5차 | Adaptive Ensemble | 안정성↑ 수익↓, 평가 metric 불일치 |
+| 6차 | 롤링 페어 재발굴 | 영구 견고 페어 = 0개, 매월 50% 회전 |
+| 7차 | 통합 시스템 + 4-way 비교 | **단순 고정 풀이 정교한 완전 통합을 압도** |
+| **8차** | **품질 필터 (cap + min_sharpe) 튜닝** | **가설 기각, 손실 -20.86% → -6.53%로 축소. "Sharpe 필터는 잉여, cap만이 본질"** |
 
 ## 핵심 발견 모음
 
@@ -95,6 +99,18 @@ python3 scripts/run_kalman_test.py     # 4차: Kalman 비교
 
 ### 4차 — 정적 vs Kalman 동적
 ![4차](charts/mvp4_kalman_comparison.png)
+
+### 5차 — Adaptive Ensemble
+![5차](charts/mvp5_ensemble_comparison.png)
+
+### 6차 — 롤링 페어 재발굴
+![6차](charts/mvp6_rolling_pairs.png)
+
+### 7차 — 통합 시스템 4-way 비교
+![7차](charts/mvp7_production_comparison.png)
+
+### 8차 — 품질 필터 튜닝 5-way 비교
+![8차](charts/mvp8_tuned_comparison.png)
 
 ## 절대 모방 금지
 
