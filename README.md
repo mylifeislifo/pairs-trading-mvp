@@ -15,7 +15,8 @@
 | 5차 | Adaptive Ensemble | 안정성↑ 수익↓, 평가 metric 불일치 |
 | 6차 | 롤링 페어 재발굴 | 영구 견고 페어 = 0개, 매월 50% 회전 |
 | 7차 | 통합 시스템 + 4-way 비교 | **단순 고정 풀이 정교한 완전 통합을 압도** |
-| **8차** | **품질 필터 (cap + min_sharpe) 튜닝** | **가설 기각, 손실 -20.86% → -6.53%로 축소. "Sharpe 필터는 잉여, cap만이 본질"** |
+| 8차 | 품질 필터 (cap + min_sharpe) 튜닝 | 가설 기각, 손실 -20.86% → -6.53%로 축소. "Sharpe 필터는 잉여, cap만이 본질" |
+| **9-A** | **(b) vs (d3) 격차 분해 — fixed_pair_pool 옵션** | **격차 -9.48%p의 -9.78%p가 "롤링 효과". 켈리/필터는 +0.30%p로 무해. 롤링 자체가 진짜 문제** |
 
 ## 핵심 발견 모음
 
@@ -111,6 +112,9 @@ python3 scripts/run_kalman_test.py     # 4차: Kalman 비교
 
 ### 8차 — 품질 필터 튜닝 5-way 비교
 ![8차](charts/mvp8_tuned_comparison.png)
+
+### 9차-A — (b) vs (d3) 격차 분해
+![9-A](charts/mvp9a_decomposition.png)
 
 ## 절대 모방 금지
 

@@ -93,7 +93,9 @@ class ProductionSystem:
                  # ===== 8차 MVP 튜닝 파라미터 =====
                  max_active_pairs: Optional[int] = None,
                  min_historical_sharpe: Optional[float] = None,
-                 quality_lookback: int = 90):
+                 quality_lookback: int = 90,
+                 # ===== 9차-A: 강제 고정 페어 풀 (롤링 우회) =====
+                 fixed_pair_pool: Optional[list] = None):
         self.finder = finder
         self.lookback_days = lookback_days
         self.refresh_every_days = refresh_every_days
@@ -110,6 +112,8 @@ class ProductionSystem:
         self.max_active_pairs = max_active_pairs
         self.min_historical_sharpe = min_historical_sharpe
         self.quality_lookback = quality_lookback
+        # 9차-A
+        self.fixed_pair_pool = fixed_pair_pool
         # 진단용: 필터로 컷된 페어 추적
         self.filter_log: list[dict] = []
 
@@ -194,13 +198,37 @@ class ProductionSystem:
             verbose: bool = False) -> PortfolioBacktestResult:
         """전체 시뮬레이션 실행"""
 
-        # 1. 롤링 페어 풀 갱신
-        manager = RollingPairsManager(
-            finder=self.finder,
-            lookback_days=self.lookback_days,
-            refresh_every_days=self.refresh_every_days,
-        )
-        snapshots = manager.run(price_df, verbose=False)
+        # 1. 페어 풀 결정
+        if self.fixed_pair_pool is not None:
+            # 9차-A: 강제 고정 풀 — 매월 같은 페어로 snapshot 합성
+            from rolling_pairs import PoolSnapshot
+            dates = price_df.index
+            n = len(dates)
+            start_offset = self.lookback_days
+            snapshots = []
+            prev_ids = set()
+            for i in range(start_offset, n, self.refresh_every_days):
+                cur_ids = {f'{p.y}~{p.x}' for p in self.fixed_pair_pool}
+                snap = PoolSnapshot(
+                    date=dates[i],
+                    pairs=list(self.fixed_pair_pool),
+                    new_pairs=sorted(cur_ids - prev_ids),
+                    dropped_pairs=[],
+                    survived_pairs=sorted(cur_ids & prev_ids),
+                )
+                snapshots.append(snap)
+                prev_ids = cur_ids
+            if verbose:
+                print(f'  fixed_pair_pool 사용: {len(self.fixed_pair_pool)}개 페어, '
+                      f'{len(snapshots)}개 snapshot')
+        else:
+            # 7차 기본 동작: 롤링 페어 발굴
+            manager = RollingPairsManager(
+                finder=self.finder,
+                lookback_days=self.lookback_days,
+                refresh_every_days=self.refresh_every_days,
+            )
+            snapshots = manager.run(price_df, verbose=False)
 
         # 2. 각 페어의 전체 백테스트 결과 미리 계산
         # (snapshot에서 등장한 모든 페어에 대해 한 번씩)
