@@ -20,6 +20,7 @@
 | **9-B** | **신규 페어 cooldown 휴리스틱 sweep** | **가설 ✓ 입증. cd=30으로 -6.53% → +0.23% 양수 회복. 그러나 (b) +2.94%는 못 따라잡음. refresh_every=30이 자연 cooldown 단위** |
 | **9-D** | **Refresh × Cooldown 2D grid sweep** | **★ (b) 최초 능가: refresh=180 + cd=0 → +6.54% (수익률), refresh=180 + cd=30 → Sharpe +0.73 / MDD -1.21%. but snapshot 3개로 표본 부족 경고. 회전율 자체가 본질적 원인임이 입증** |
 | **9-E** | **10년 장기 데이터로 9-D 재검증** | **★★★ 9-D 결과 인공물 입증: 5개 변형 중 4개 Sharpe 부호 반전. 모든 변형 10년에서 음수. (b)조차 +2.94% → -0.55%로 무너짐. 진짜 결론: "3년 백테스트는 본질적으로 신뢰 불가". 6차 "영구 견고 페어=0개" 강력 재확인 (10년 train에서 2개만)** |
+| **9-C** | **Walk-forward 검증 + 부트스트랩 95% CI** | **★★★ 통계적 사형 선고: 3개 변형 모두 alpha 없음 (CI에 0 포함 or 음수). (b) 양수 비율 64.3%지만 평균 -0.22 (꼬리 위험). r180,cd=30 양수 단 7.1% — 9-D는 완전 운빨로 확정. 메타 결론: "이 universe + 단순 z-score는 진짜 alpha 생성 불가"** |
 
 ## 핵심 발견 모음
 
@@ -127,6 +128,9 @@ python3 scripts/run_kalman_test.py     # 4차: Kalman 비교
 
 ### 9차-E — 10년 장기 검증 (9-D 붕괴)
 ![9-E](charts/mvp9e_long_horizon.png)
+
+### 9차-C — Walk-forward 통계적 검증
+![9-C](charts/mvp9c_walkforward.png)
 
 ## 절대 모방 금지
 
