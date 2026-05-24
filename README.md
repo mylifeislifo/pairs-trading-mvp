@@ -22,6 +22,7 @@
 | **9-E** | **10년 장기 데이터로 9-D 재검증** | **★★★ 9-D 결과 인공물 입증: 5개 변형 중 4개 Sharpe 부호 반전. 모든 변형 10년에서 음수. (b)조차 +2.94% → -0.55%로 무너짐. 진짜 결론: "3년 백테스트는 본질적으로 신뢰 불가". 6차 "영구 견고 페어=0개" 강력 재확인 (10년 train에서 2개만)** |
 | **9-C** | **Walk-forward 검증 + 부트스트랩 95% CI** | **★★★ 통계적 사형 선고: 3개 변형 모두 alpha 없음 (CI에 0 포함 or 음수). (b) 양수 비율 64.3%지만 평균 -0.22 (꼬리 위험). r180,cd=30 양수 단 7.1% — 9-D는 완전 운빨로 확정. 메타 결론: "이 universe + 단순 z-score는 진짜 alpha 생성 불가"** |
 | **10-A** | **Universe 확장 28→99 종목, walk-forward 재검증** | **★ 가설 기각: 평균 Sharpe -0.22 → -0.16 (+0.06 미미), 양수 비율 64.3% → 57.1% 감소, CI [-0.65, +0.32] 여전히 0 포함. 발견: 신호 양극화 (양수 윈도우는 더 양수, 음수는 더 음수). Universe 확장이 alpha 못 만들고 변동성만 키움. 페어 트레이딩 본질적 한계 확정** |
+| **B-2** | **크립토 펀딩비 차익거래 (델타 뉴트럴) — OKX 가격 + Hyperliquid 펀딩** | **★★★ MVP 시리즈 최초 진짜 alpha 발견. Walk-forward Sharpe 보정 후 BTC +12.55 CI [+10.70, +14.31], ETH +11.05 CI [+8.84, +13.26]. 양수 윈도우 96.4-100%. 9-C/10-A 표준 통과. 단, 시간 추세 감소 (2024 +11% → 2026 +0.8%) — 진짜 alpha지만 점진 소멸 가능성. 1h 정밀 시뮬로 일별 모델 25% 편향 보정** |
 
 ## 핵심 발견 모음
 
@@ -135,6 +136,18 @@ python3 scripts/run_kalman_test.py     # 4차: Kalman 비교
 
 ### 10차-A — Universe 확장 (28→99) 재검증
 ![10-A](charts/mvp10a_universe_expansion.png)
+
+### B-2 — 크립토 펀딩비 차익 (3년 baseline)
+![B-2](charts/b2_funding_arbitrage.png)
+
+### B-2 정밀 검증 — 1h vs 일별 모델 비교
+![B-2 precise](charts/b2_precise_vs_daily.png)
+
+### B-2 보정 + Walk-forward
+![B-2 corrected](charts/b2_corrected.png)
+
+### B-2 Walk-forward 분포
+![B-2 walkforward](charts/b2_walkforward.png)
 
 ## 절대 모방 금지
 
